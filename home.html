@@ -1,0 +1,1197 @@
+<script type="text/javascript">
+        var gk_isXlsx = false;
+        var gk_xlsxFileLookup = {};
+        var gk_fileData = {};
+        function loadFileData(filename) {
+        if (gk_isXlsx && gk_xlsxFileLookup[filename]) {
+            try {
+                var workbook = XLSX.read(gk_fileData[filename], { type: 'base64' });
+                var firstSheetName = workbook.SheetNames[0];
+                var worksheet = workbook.Sheets[firstSheetName];
+
+                // Convert sheet to JSON to filter blank rows
+                var jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, blankrows: false, defval: '' });
+                // Filter out blank rows (rows where all cells are empty, null, or undefined)
+                var filteredData = jsonData.filter(row =>
+                    row.some(cell => cell !== '' && cell !== null && cell !== undefined)
+                );
+
+                // Convert filtered JSON back to CSV
+                var csv = XLSX.utils.aoa_to_sheet(filteredData); // Create a new sheet from filtered array of arrays
+                csv = XLSX.utils.sheet_to_csv(csv, { header: 1 });
+                return csv;
+            } catch (e) {
+                console.error(e);
+                return "";
+            }
+        }
+        return gk_fileData[filename] || "";
+        }
+        </script><!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#2563eb">
+    <title>PrepTrack - Exam Preparation Platform</title>
+    <link rel="manifest" href="/manifest.json">
+    <link rel="icon" href="https://via.placeholder.com/192" type="image/png">
+    <link rel="apple-touch-icon" href="https://via.placeholder.com/192">
+    <script src="https://cdn.jsdelivr.net/npm/react@18.2.0/umd/react.development.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/react-dom@18.2.0/umd/react-dom.development.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@babel/standalone@7.22.9/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <style>
+        .dropdown .dropdown-menu {
+            display: none;
+        }
+        .dropdown:hover .dropdown-menu {
+            display: block;
+        }
+        @media (max-width: 768px) {
+            .dropdown:hover .dropdown-menu {
+                display: none;
+            }
+            .dropdown.active .dropdown-menu {
+                display: block;
+            }
+        }
+        .dark .bg-gray-100 {
+            background-color: #1f2937;
+        }
+        .dark .bg-white {
+            background-color: #374151;
+        }
+        .dark .text-gray-600 {
+            color: #d1d5db;
+        }
+        .dark .bg-gray-50 {
+            background-color: #4b5563;
+        }
+        .dark .text-black {
+            color: #f3f4f6;
+        }
+        .dark .bg-blue-600 {
+            background-color: #1e40af;
+        }
+        .dark .hover\:bg-blue-700:hover {
+            background-color: #1e3a8a;
+        }
+        .toast {
+            transition: opacity 0.5s ease-in-out;
+        }
+        .splash-screen {
+            transition: opacity 0.5s ease-in-out;
+        }
+        body {
+            overscroll-behavior: none;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 font-sans transition-colors duration-300">
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+
+        const initialExams = [
+            {
+                name: "SSC CGL",
+                subjects: [
+                    {
+                        name: "General Intelligence and Reasoning",
+                        topics: [
+                            { name: "Analogies", subtopics: ["Semantic Analogies", "Symbolic/Number Analogies", "Figural Analogies"], completedSubtopics: [] },
+                            { name: "Classification", subtopics: ["Semantic Classification", "Number Classification", "Figural Classification"], completedSubtopics: [] },
+                            { name: "Series", subtopics: ["Number Series", "Letter Series", "Mixed Series"], completedSubtopics: [] },
+                            { name: "Coding-Decoding", subtopics: ["Letter Coding", "Number Coding", "Symbol Coding"], completedSubtopics: [] },
+                            { name: "Non-Verbal Reasoning", subtopics: ["Paper Folding", "Mirror Images", "Water Images"], completedSubtopics: [] },
+                        ],
+                        completedTopics: [],
+                        driveLinks: {}
+                    },
+                    {
+                        name: "Quantitative Aptitude",
+                        topics: [
+                            { name: "Arithmetic", subtopics: ["Percentage", "Ratio and Proportion", "Profit and Loss", "Time and Work", "Speed, Distance and Time"], completedSubtopics: [] },
+                            { name: "Algebra", subtopics: ["Linear Equations", "Quadratic Equations", "Polynomials"], completedSubtopics: [] },
+                            { name: "Geometry", subtopics: ["Triangles", "Circles", "Polygons", "Coordinate Geometry"], completedSubtopics: [] },
+                            { name: "Mensuration", subtopics: ["2D Shapes", "3D Shapes"], completedSubtopics: [] },
+                            { name: "Data Interpretation", subtopics: ["Bar Graphs", "Pie Charts", "Tables"], completedSubtopics: [] },
+                        ],
+                        completedTopics: [],
+                        driveLinks: {}
+                    },
+                    {
+                        name: "General Awareness",
+                        topics: [
+                            { name: "History", subtopics: ["Ancient India", "Medieval India", "Modern India"], completedSubtopics: [] },
+                            { name: "Geography", subtopics: ["Physical Geography", "Indian Geography", "World Geography"], completedSubtopics: [] },
+                            { name: "Polity", subtopics: ["Constitution", "Governance", "Judiciary"], completedSubtopics: [] },
+                            { name: "Economy", subtopics: ["Basic Concepts", "Budget", "Economic Survey"], completedSubtopics: [] },
+                            { name: "Current Affairs", subtopics: ["National Events", "International Events", "Awards and Honors"], completedSubtopics: [] },
+                        ],
+                        completedTopics: [],
+                        driveLinks: {}
+                    },
+                    {
+                        name: "English Comprehension",
+                        topics: [
+                            { name: "Grammar", subtopics: ["Tenses", "Articles", "Prepositions", "Subject-Verb Agreement"], completedSubtopics: [] },
+                            { name: "Vocabulary", subtopics: ["Synonyms", "Antonyms", "Idioms and Phrases"], completedSubtopics: [] },
+                            { name: "Reading Comprehension", subtopics: ["Passage Analysis", "Inference Questions"], completedSubtopics: [] },
+                            { name: "Sentence Correction", subtopics: ["Error Spotting", "Sentence Improvement"], completedSubtopics: [] },
+                        ],
+                        completedTopics: [],
+                        driveLinks: {}
+                    },
+                    {
+                        name: "Statistics (Tier II)",
+                        topics: [
+                            { name: "Collection and Representation", subtopics: ["Data Classification", "Tabulation", "Graphs"], completedSubtopics: [] },
+                            { name: "Measures of Central Tendency", subtopics: ["Mean", "Median", "Mode"], completedSubtopics: [] },
+                            { name: "Probability", subtopics: ["Basic Probability", "Conditional Probability"], completedSubtopics: [] },
+                        ],
+                        completedTopics: [],
+                        driveLinks: {}
+                    },
+                    {
+                        name: "General Studies (Finance & Economics, Tier II)",
+                        topics: [
+                            { name: "Finance", subtopics: ["Financial Accounting", "Auditing"], completedSubtopics: [] },
+                            { name: "Economics", subtopics: ["Microeconomics", "Macroeconomics", "Indian Economy"], completedSubtopics: [] },
+                        ],
+                        completedTopics: [],
+                        driveLinks: {}
+                    },
+                ]
+            },
+            {
+                name: "RAS",
+                subjects: [
+                    {
+                        name: "General Knowledge and General Studies (Prelims)",
+                        topics: [
+                            { name: "History of Rajasthan", subtopics: ["Ancient Rajasthan", "Medieval Rajasthan", "Modern Rajasthan", "Freedom Movement"], completedSubtopics: [] },
+                            { name: "Indian History", subtopics: ["Indus Valley Civilization", "Vedic Period", "Mauryan Empire", "Freedom Struggle"], completedSubtopics: [] },
+                            { name: "Geography of Rajasthan", subtopics: ["Physical Features", "Climate", "Soil and Vegetation"], completedSubtopics: [] },
+                            { name: "Indian Geography", subtopics: ["Physical Features", "Climate", "Population"], completedSubtopics: [] },
+                            { name: "Economy", subtopics: ["Rajasthan Economy", "Indian Economy", "Budget"], completedSubtopics: [] },
+                        ],
+                        completedTopics: [],
+                        driveLinks: {}
+                    },
+                    {
+                        name: "General Studies I (Mains)",
+                        topics: [
+                            { name: "History, Art, Culture", subtopics: ["Rajasthan Culture", "Indian Culture", "World History"], completedSubtopics: [] },
+                            { name: "Sociology and Management", subtopics: ["Social Issues", "Management Principles"], completedSubtopics: [] },
+                        ],
+                        completedTopics: [],
+                        driveLinks: {}
+                    },
+                    {
+                        name: "General Studies II (Mains)",
+                        topics: [
+                            { name: "Governance", subtopics: ["Administrative System", "Ethics in Governance"], completedSubtopics: [] },
+                            { name: "Science and Technology", subtopics: ["Space Technology", "Biotechnology"], completedSubtopics: [] },
+                        ],
+                        completedTopics: [],
+                        driveLinks: {}
+                    },
+                    {
+                        name: "General Studies III (Mains)",
+                        topics: [
+                            { name: "Economic Development", subtopics: ["Planning", "Infrastructure"], completedSubtopics: [] },
+                            { name: "Security Issues", subtopics: ["Internal Security", "Cyber Security"], completedSubtopics: [] },
+                        ],
+                        completedTopics: [],
+                        driveLinks: {}
+                    },
+                ]
+            },
+            {
+                name: "UPSC CSE",
+                subjects: [
+                    {
+                        name: "General Studies I (Prelims)",
+                        topics: [
+                            { name: "Indian Polity", subtopics: ["Constitution", "Fundamental Rights", "Parliament"], completedSubtopics: [] },
+                            { name: "Geography", subtopics: ["Physical Geography", "Indian Geography", "World Geography"], completedSubtopics: [] },
+                            { name: "History", subtopics: ["Ancient India", "Medieval India", "Modern India"], completedSubtopics: [] },
+                            { name: "Economy", subtopics: ["Basic Concepts", "Economic Development", "Budget"], completedSubtopics: [] },
+                            { name: "Environment", subtopics: ["Biodiversity", "Climate Change"], completedSubtopics: [] },
+                        ],
+                        completedTopics: [],
+                        driveLinks: {}
+                    },
+                    {
+                        name: "CSAT (Prelims)",
+                        topics: [
+                            { name: "Comprehension", subtopics: ["Reading Skills", "Inference"], completedSubtopics: [] },
+                            { name: "Quantitative Aptitude", subtopics: ["Arithmetic", "Data Interpretation"], completedSubtopics: [] },
+                            { name: "Logical Reasoning", subtopics: ["Puzzles", "Syllogisms"], completedSubtopics: [] },
+                        ],
+                        completedTopics: [],
+                        driveLinks: {}
+                    },
+                    {
+                        name: "General Studies I (Mains)",
+                        topics: [
+                            { name: "Indian Heritage", subtopics: ["Art and Culture", "Literature"], completedSubtopics: [] },
+                            { name: "Modern History", subtopics: ["Freedom Struggle", "Post-Independence"], completedSubtopics: [] },
+                            { name: "Geography", subtopics: ["Physical Geography", "Human Geography"], completedSubtopics: [] },
+                        ],
+                        completedTopics: [],
+                        driveLinks: {}
+                    },
+                    {
+                        name: "General Studies II (Mains)",
+                        topics: [
+                            { name: "Governance", subtopics: ["Constitution", "Social Justice"], completedSubtopics: [] },
+                            { name: "International Relations", subtopics: ["India and Neighbors", "Global Institutions"], completedSubtopics: [] },
+                        ],
+                        completedTopics: [],
+                        driveLinks: {}
+                    },
+                    {
+                        name: "Sociology Optional",
+                        topics: [
+                            { name: "Fundamentals of Sociology", subtopics: ["Sociological Concepts", "Research Methods"], completedSubtopics: [] },
+                            { name: "Sociological Thinkers", subtopics: ["Marx", "Durkheim", "Weber"], completedSubtopics: [] },
+                            { name: "Indian Society", subtopics: ["Caste", "Family", "Religion"], completedSubtopics: [] },
+                        ],
+                        completedTopics: [],
+                        driveLinks: {}
+                    },
+                ]
+            },
+            {
+                name: "UGC NET Sociology",
+                subjects: [
+                    {
+                        name: "Sociological Theory",
+                        topics: [
+                            { name: "Classical Theories", subtopics: ["Functionalism", "Conflict Theory", "Symbolic Interactionism"], completedSubtopics: [] },
+                            { name: "Modern Theories", subtopics: ["Postmodernism", "Feminism", "Critical Theory"], completedSubtopics: [] },
+                        ],
+                        completedTopics: [],
+                        driveLinks: {}
+                    },
+                    {
+                        name: "Research Methodology",
+                        topics: [
+                            { name: "Quantitative Methods", subtopics: ["Surveys", "Statistical Analysis"], completedSubtopics: [] },
+                            { name: "Qualitative Methods", subtopics: ["Ethnography", "Case Studies"], completedSubtopics: [] },
+                            { name: "Research Design", subtopics: ["Hypothesis", "Sampling"], completedSubtopics: [] },
+                        ],
+                        completedTopics: [],
+                        driveLinks: {}
+                    },
+                    {
+                        name: "Indian Society",
+                        topics: [
+                            { name: "Social Structure", subtopics: ["Caste", "Class", "Tribe"], completedSubtopics: [] },
+                            { name: "Social Change", subtopics: ["Modernization", "Globalization", "Social Movements"], completedSubtopics: [] },
+                        ],
+                        completedTopics: [],
+                        driveLinks: {}
+                    },
+                    {
+                        name: "Social Issues",
+                        topics: [
+                            { name: "Gender", subtopics: ["Patriarchy", "Feminism"], completedSubtopics: [] },
+                            { name: "Environment", subtopics: ["Sustainable Development", "Environmental Movements"], completedSubtopics: [] },
+                        ],
+                        completedTopics: [],
+                        driveLinks: {}
+                    },
+                ]
+            },
+            {
+                name: "Assistant Professor Sociology",
+                subjects: [
+                    {
+                        name: "Sociological Concepts",
+                        topics: [
+                            { name: "Basic Concepts", subtopics: ["Society", "Culture", "Socialization"], completedSubtopics: [] },
+                            { name: "Social Institutions", subtopics: ["Family", "Education", "Religion"], completedSubtopics: [] },
+                        ],
+                        completedTopics: [],
+                        driveLinks: {}
+                    },
+                    {
+                        name: "Sociological Theories",
+                        topics: [
+                            { name: "Indological", subtopics: ["Textual Analysis", "Cultural Roots"], completedSubtopics: [] },
+                            { name: "Structural-Functional", subtopics: ["Social Institutions", "Social Stability"], completedSubtopics: [] },
+                            { name: "Marxist", subtopics: ["Class Struggle", "Capitalism"], completedSubtopics: [] },
+                        ],
+                        completedTopics: [],
+                        driveLinks: {}
+                    },
+                    {
+                        name: "Indian Sociology",
+                        topics: [
+                            { name: "Caste System", subtopics: ["Varna", "Jati", "Social Mobility"], completedSubtopics: [] },
+                            { name: "Rural Sociology", subtopics: ["Agrarian Structure", "Panchayati Raj"], completedSubtopics: [] },
+                            { name: "Thinkers", subtopics: ["G.S. Ghurye", "M.N. Srinivas", "A.R. Desai"], completedSubtopics: [] },
+                        ],
+                        completedTopics: [],
+                        driveLinks: {}
+                    },
+                ]
+            },
+        ];
+
+        function App() {
+            const [exams, setExams] = useState(initialExams);
+            const [deadlines, setDeadlines] = useState([]);
+            const [searchQuery, setSearchQuery] = useState("");
+            const [selectedExam, setSelectedExam] = useState("All");
+            const [currentPage, setCurrentPage] = useState("home");
+            const [quote, setQuote] = useState("Success is not final, failure is not fatal: It is the courage to continue that counts.");
+            const [expandedSubjects, setExpandedSubjects] = useState({});
+            const [expandedTopics, setExpandedTopics] = useState({});
+            const [theme, setTheme] = useState("light");
+            const [undoStack, setUndoStack] = useState([]);
+            const [notification, setNotification] = useState(null);
+            const [editMode, setEditMode] = useState({});
+            const [isLoading, setIsLoading] = useState(true);
+            const [dropdownOpen, setDropdownOpen] = useState(false);
+
+            const quotes = [
+                "Success is not final, failure is not fatal: It is the courage to continue that counts.",
+                "The only way to do great work is to love what you do.",
+                "Believe you can and you're halfway there."
+            ];
+
+            useEffect(() => {
+                setTimeout(() => setIsLoading(false), 1000);
+                const interval = setInterval(() => {
+                    setQuote(quotes[Math.floor(Math.random() * quotes.length)]);
+                }, 30000);
+                return () => clearInterval(interval);
+            }, []);
+
+            useEffect(() => {
+                document.body.classList.toggle("dark", theme === "dark");
+            }, [theme]);
+
+            useEffect(() => {
+                if (notification) {
+                    const timeout = setTimeout(() => setNotification(null), 3000);
+                    return () => clearTimeout(timeout);
+                }
+            }, [notification]);
+
+            useEffect(() => {
+                if ('serviceWorker' in navigator) {
+                    navigator.serviceWorker.register('/sw.js').catch(err => console.error('Service Worker registration failed:', err));
+                }
+            }, []);
+
+            useEffect(() => {
+                let touchStartX = 0;
+                let touchEndX = 0;
+
+                const handleTouchStart = (e) => {
+                    touchStartX = e.changedTouches[0].screenX;
+                };
+
+                const handleTouchEnd = (e) => {
+                    touchEndX = e.changedTouches[0].screenX;
+                    handleSwipe();
+                };
+
+                const handleSwipe = () => {
+                    const diff = touchStartX - touchEndX;
+                    if (Math.abs(diff) > 50) {
+                        if (diff > 0) {
+                            if (currentPage === "home") setCurrentPage("deadlines");
+                            else if (currentPage === "deadlines") setCurrentPage("progressDashboard");
+                        } else {
+                            if (currentPage === "progressDashboard") setCurrentPage("deadlines");
+                            else if (currentPage === "deadlines") setCurrentPage("home");
+                        }
+                    }
+                };
+
+                window.addEventListener('touchstart', handleTouchStart);
+                window.addEventListener('touchend', handleTouchEnd);
+
+                return () => {
+                    window.removeEventListener('touchstart', handleTouchStart);
+                    window.removeEventListener('touchend', handleTouchEnd);
+                };
+            }, [currentPage]);
+
+            const addSubject = (examIndex, subjectName) => {
+                if (!subjectName) {
+                    setNotification({ type: "error", message: "Please provide a subject name." });
+                    return;
+                }
+                const newExams = [...exams];
+                newExams[examIndex].subjects.push({
+                    name: subjectName,
+                    topics: [],
+                    completedTopics: [],
+                    driveLinks: {}
+                });
+                setExams(newExams);
+                setNotification({ type: "success", message: `Subject "${subjectName}" added successfully!` });
+            };
+
+            const addTopic = (examIndex, subjectIndex, topicName, subtopics) => {
+                if (!topicName) {
+                    setNotification({ type: "error", message: "Please provide a topic name." });
+                    return;
+                }
+                const newExams = [...exams];
+                newExams[examIndex].subjects[subjectIndex].topics.push({
+                    name: topicName,
+                    subtopics: subtopics ? subtopics.split(",").map(s => s.trim()).filter(s => s) : [],
+                    completedSubtopics: []
+                });
+                setExams(newExams);
+                setNotification({ type: "success", message: `Topic "${topicName}" added successfully!` });
+            };
+
+            const addSubtopic = (examIndex, subjectIndex, topicIndex, subtopic) => {
+                if (!subtopic) {
+                    setNotification({ type: "error", message: "Please provide a subtopic name." });
+                    return;
+                }
+                const newExams = [...exams];
+                newExams[examIndex].subjects[subjectIndex].topics[topicIndex].subtopics.push(subtopic);
+                setExams(newExams);
+                setNotification({ type: "success", message: `Subtopic "${subtopic}" added successfully!` });
+            };
+
+            const addDeadline = (examName, date) => {
+                setDeadlines([...deadlines, { examName, date }]);
+            };
+
+            const toggleTopicCompletion = (examName, subjectIndex, topicName) => {
+                const examIndex = exams.findIndex(exam => exam.name === examName);
+                if (examIndex === -1) return;
+                const newExams = [...exams];
+                const completedTopics = newExams[examIndex].subjects[subjectIndex].completedTopics;
+                if (completedTopics.includes(topicName)) {
+                    newExams[examIndex].subjects[subjectIndex].completedTopics = completedTopics.filter(t => t !== topicName);
+                    setNotification({ type: "success", message: `Topic "${topicName}" marked as undone.` });
+                } else {
+                    newExams[examIndex].subjects[subjectIndex].completedTopics.push(topicName);
+                    setNotification({ type: "success", message: `Topic "${topicName}" marked as done.` });
+                }
+                setExams(newExams);
+            };
+
+            const toggleSubtopicCompletion = (examName, subjectIndex, topicIndex, subtopic) => {
+                const examIndex = exams.findIndex(exam => exam.name === examName);
+                if (examIndex === -1) return;
+                const newExams = [...exams];
+                const completedSubtopics = newExams[examIndex].subjects[subjectIndex].topics[topicIndex].completedSubtopics;
+                if (completedSubtopics.includes(subtopic)) {
+                    newExams[examIndex].subjects[subjectIndex].topics[topicIndex].completedSubtopics = completedSubtopics.filter(s => s !== subtopic);
+                    setNotification({ type: "success", message: `Subtopic "${subtopic}" marked as undone.` });
+                } else {
+                    newExams[examIndex].subjects[subjectIndex].topics[topicIndex].completedSubtopics.push(subtopic);
+                    setNotification({ type: "success", message: `Subtopic "${subtopic}" marked as done.` });
+                }
+                setExams(newExams);
+            };
+
+            const addDriveLink = (examIndex, subjectIndex, topic, link) => {
+                const newExams = [...exams];
+                newExams[examIndex].subjects[subjectIndex].driveLinks[topic] = link;
+                setExams(newExams);
+                setNotification({ type: "success", message: `Drive link added for "${topic}".` });
+            };
+
+            const deleteSubject = (examIndex, subjectIndex) => {
+                const newExams = [...exams];
+                const deletedSubject = newExams[examIndex].subjects[subjectIndex];
+                newExams[examIndex].subjects.splice(subjectIndex, 1);
+                setExams(newExams);
+                setUndoStack([...undoStack, { type: "subject", examIndex, subjectIndex, data: deletedSubject }]);
+                setNotification({ type: "success", message: `Subject deleted. Undo available.` });
+            };
+
+            const deleteTopic = (examIndex, subjectIndex, topicName) => {
+                const newExams = [...exams];
+                const topicIndex = newExams[examIndex].subjects[subjectIndex].topics.findIndex(t => t.name === topicName);
+                const deletedTopic = newExams[examIndex].subjects[subjectIndex].topics[topicIndex];
+                newExams[examIndex].subjects[subjectIndex].topics = newExams[examIndex].subjects[subjectIndex].topics.filter(t => t.name !== topicName);
+                newExams[examIndex].subjects[subjectIndex].completedTopics = newExams[examIndex].subjects[subjectIndex].completedTopics.filter(t => t !== topicName);
+                delete newExams[examIndex].subjects[subjectIndex].driveLinks[topicName];
+                setExams(newExams);
+                setUndoStack([...undoStack, { type: "topic", examIndex, subjectIndex, topicIndex, data: deletedTopic }]);
+                setNotification({ type: "success", message: `Topic deleted. Undo available.` });
+            };
+
+            const deleteSubtopic = (examIndex, subjectIndex, topicIndex, subtopic) => {
+                const newExams = [...exams];
+                const deletedSubtopic = subtopic;
+                newExams[examIndex].subjects[subjectIndex].topics[topicIndex].subtopics = 
+                    newExams[examIndex].subjects[subjectIndex].topics[topicIndex].subtopics.filter(s => s !== subtopic);
+                newExams[examIndex].subjects[subjectIndex].topics[topicIndex].completedSubtopics = 
+                    newExams[examIndex].subjects[subjectIndex].topics[topicIndex].completedSubtopics.filter(s => s !== subtopic);
+                setExams(newExams);
+                setUndoStack([...undoStack, { type: "subtopic", examIndex, subjectIndex, topicIndex, data: deletedSubtopic }]);
+                setNotification({ type: "success", message: `Subtopic deleted. Undo available.` });
+            };
+
+            const undoDelete = () => {
+                if (undoStack.length === 0) return;
+                const lastAction = undoStack[undoStack.length - 1];
+                const newExams = [...exams];
+                if (lastAction.type === "subject") {
+                    newExams[lastAction.examIndex].subjects.splice(lastAction.subjectIndex, 0, lastAction.data);
+                } else if (lastAction.type === "topic") {
+                    newExams[lastAction.examIndex].subjects[lastAction.subjectIndex].topics.splice(lastAction.topicIndex, 0, lastAction.data);
+                } else if (lastAction.type === "subtopic") {
+                    newExams[lastAction.examIndex].subjects[lastAction.subjectIndex].topics[lastAction.topicIndex].subtopics.push(lastAction.data);
+                }
+                setExams(newExams);
+                setUndoStack(undoStack.slice(0, -1));
+                setNotification({ type: "success", message: `Undo successful.` });
+            };
+
+            const exportToExcel = (data, filename) => {
+                try {
+                    if (!data || data.length === 0) {
+                        setNotification({ type: "error", message: "No data available to export." });
+                        return;
+                    }
+                    const ws = XLSX.utils.json_to_sheet(data, { skipHeader: false });
+                    const wb = XLSX.utils.book_new();
+                    XLSX.utils.book_append_sheet(wb, ws, "Sheet1");
+                    XLSX.write(wb, `${filename}.xlsx`);
+                    setNotification({ type: "success", message: `Exported ${filename}.xlsx successfully!` });
+                } catch (error) {
+                    console.error("Excel export error:", error);
+                    setNotification({ type: "error", message: "Failed to export to Excel." });
+                }
+            };
+
+            const exportToPDF = (data, filename, headers) => {
+                try {
+                    if (!data || data.length === 0) {
+                        setNotification({ type: "error", message: "No data available to export." });
+                        return;
+                    }
+                    const { jsPDF } = window.jspdf;
+                    const doc = new jsPDF();
+                    doc.setFontSize(16);
+                    doc.text(filename, 10, 10);
+                    doc.setFontSize(12);
+                    let y = 20;
+                    const colWidths = headers.map(() => 40);
+                    headers.forEach((header, i) => {
+                        doc.text(header, 10 + i * colWidths[i], y);
+                    });
+                    y += 10;
+                    doc.line(10, y - 5, 190, y - 5);
+                    data.forEach(row => {
+                        Object.values(row).forEach((value, i) => {
+                            doc.text(String(value), 10 + i * colWidths[i], y);
+                        });
+                        y += 10;
+                        if (y > 270) {
+                            doc.addPage();
+                            y = 10;
+                        }
+                    });
+                    doc.save(`${filename}.pdf`);
+                    setNotification({ type: "success", message: `Exported ${filename}.pdf successfully!` });
+                } catch (error) {
+                    console.error("PDF export error:", error);
+                    setNotification({ type: "error", message: "Failed to export to PDF." });
+                }
+            };
+
+            const getSubjectProgress = (subject) => {
+                const totalSubtopics = subject.topics.reduce((sum, topic) => sum + topic.subtopics.length, 0);
+                const totalCompletedSubtopics = subject.topics.reduce((sum, topic) => sum + topic.completedSubtopics.length, 0);
+                if (totalSubtopics === 0) return 0;
+                return (totalCompletedSubtopics / totalSubtopics) * 100;
+            };
+
+            const getExamProgress = (exam) => {
+                const totalSubtopics = exam.subjects.reduce((sum, subject) => 
+                    sum + subject.topics.reduce((s, topic) => s + topic.subtopics.length, 0), 0);
+                const totalCompletedSubtopics = exam.subjects.reduce((sum, subject) => 
+                    sum + subject.topics.reduce((s, topic) => s + topic.completedSubtopics.length, 0), 0);
+                if (totalSubtopics === 0) return 0;
+                return (totalCompletedSubtopics / totalSubtopics) * 100;
+            };
+
+            const getDaysUntil = (date) => {
+                const today = new Date();
+                const examDate = new Date(date);
+                const diffTime = examDate - today;
+                return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+            };
+
+            const toggleSubjectExpansion = (key) => {
+                setExpandedSubjects(prev => ({
+                    ...prev,
+                    [key]: !prev[key]
+                }));
+            };
+
+            const toggleTopicExpansion = (key) => {
+                setExpandedTopics(prev => ({
+                    ...prev,
+                    [key]: !prev[key]
+                }));
+            };
+
+            const toggleEditMode = (examIndex, type, subjectIndex = null, topicIndex = null) => {
+                const key = subjectIndex !== null ? 
+                    topicIndex !== null ? `${examIndex}-${subjectIndex}-${topicIndex}-${type}` : `${examIndex}-${subjectIndex}-${type}` : 
+                    `${examIndex}-${type}`;
+                setEditMode(prev => ({
+                    ...prev,
+                    [key]: !prev[key]
+                }));
+            };
+
+            const filteredExams = exams.filter(exam => 
+                (selectedExam === "All" || exam.name === selectedExam) &&
+                (exam.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                exam.subjects.some(subject =>
+                    subject.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                    subject.topics.some(topic =>
+                        topic.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                        topic.subtopics.some(subtopic =>
+                            subtopic.toLowerCase().includes(searchQuery.toLowerCase())
+                        )
+                    ))
+                )
+            );
+
+            const renderHome = () => (
+                <div className="container mx-auto px-4 py-8 pb-20 md:pb-8">
+                    {notification && (
+                        <div className={`fixed top-4 right-4 p-4 rounded-lg text-white toast ${notification.type === "success" ? "bg-green-500" : "bg-red-500"} z-50`}>
+                            {notification.message}
+                        </div>
+                    )}
+                    <div className="bg-white rounded-lg shadow-md p-6 mb-6">
+                        <h2 className="text-xl md:text-2xl font-bold mb-4">Motivational Quote</h2>
+                        <p className="text-base md:text-lg italic">"{quote}"</p>
+                    </div>
+
+                    <div className="bg-white rounded-lg shadow-md p-6 mb-6">
+                        <h2 className="text-xl md:text-2xl font-bold mb-4">Upcoming Deadlines</h2>
+                        {deadlines.length > 0 ? (
+                            deadlines.map((deadline, index) => (
+                                <div key={index} className="mb-2 p-2 bg-gray-50 rounded-lg text-sm">
+                                    <p>{deadline.examName}: {getDaysUntil(deadline.date)} days remaining (Date: {deadline.date})</p>
+                                </div>
+                            ))
+                        ) : (
+                            <p>No deadlines set.</p>
+                        )}
+                    </div>
+
+                    <div className="flex flex-col gap-4 mb-6">
+                        <select
+                            className="p-3 border rounded-lg text-base w-full"
+                            value={selectedExam}
+                            onChange={(e) => setSelectedExam(e.target.value)}
+                        >
+                            <option value="All">All Exams</option>
+                            {exams.map(exam => (
+                                <option key={exam.name} value={exam.name}>{exam.name}</option>
+                            ))}
+                        </select>
+                        <input
+                            type="text"
+                            placeholder="Search topics/subtopics..."
+                            className="p-3 border rounded-lg text-base w-full"
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                        />
+                    </div>
+
+                    <div className="grid grid-cols-1 gap-6">
+                        {filteredExams.map((exam, displayIndex) => {
+                            const examIndex = exams.findIndex(e => e.name === exam.name);
+                            return (
+                            <div key={exam.name} className="bg-white rounded-lg shadow-md p-6 transition">
+                                <div className="relative pt-1 mb-2">
+                                    <div className="overflow-hidden h-2 mb-2 text-xs flex rounded bg-gray-200">
+                                        <div
+                                            style={{ width: `${getExamProgress(exam)}%` }}
+                                            className="shadow-none flex flex-col text-center whitespace-nowrap text-white justify-center bg-blue-500"
+                                        ></div>
+                                    </div>
+                                    <p className="text-sm text-gray-600">{getExamProgress(exam).toFixed(2)}% Complete</p>
+                                </div>
+                                <h3 className="text-lg md:text-xl font-bold mb-2">{exam.name}</h3>
+                                <div className="mb-4">
+                                    <button
+                                        className="bg-blue-500 text-white px-4 py-3 rounded-lg text-base w-full md:w-auto"
+                                        onClick={() => toggleEditMode(examIndex, "subject")}
+                                    >
+                                        {editMode[`${examIndex}-subject`] ? "Cancel" : "Add Subject"}
+                                    </button>
+                                    {editMode[`${examIndex}-subject`] && (
+                                        <div className="mt-2 flex flex-col md:flex-row gap-2">
+                                            <input
+                                                type="text"
+                                                placeholder="Subject Name"
+                                                className="p-3 border rounded-lg flex-1 text-base"
+                                                id={`subject-${examIndex}`}
+                                            />
+                                            <button
+                                                className="bg-green-500 text-white px-4 py-3 rounded-lg text-base"
+                                                onClick={() => {
+                                                    const subjectName = document.getElementById(`subject-${examIndex}`).value;
+                                                    addSubject(examIndex, subjectName);
+                                                    document.getElementById(`subject-${examIndex}`).value = "";
+                                                    toggleEditMode(examIndex, "subject");
+                                                }}
+                                            >
+                                                Save
+                                            </button>
+                                        </div>
+                                    )}
+                                </div>
+                                {exam.subjects.map((subject, subjectIndex) => {
+                                    const subjectKey = `${examIndex}-${subjectIndex}`;
+                                    const isSubjectExpanded = expandedSubjects[subjectKey];
+                                    return (
+                                        <div key={subject.name} className="mb-4">
+                                            <div className="relative pt-1 mb-2">
+                                                <div className="overflow-hidden h-2 mb-2 text-xs flex rounded bg-gray-200">
+                                                    <div
+                                                        style={{ width: `${getSubjectProgress(subject)}%` }}
+                                                        className="shadow-none flex flex-col text-center whitespace-nowrap text-white justify-center bg-blue-500"
+                                                    ></div>
+                                                </div>
+                                                <p className="text-sm text-gray-600">{getSubjectProgress(subject).toFixed(2)}% Complete</p>
+                                            </div>
+                                            <div className="flex items-center justify-between">
+                                                <h4 
+                                                    className="text-base md:text-lg font-semibold cursor-pointer hover:text-blue-600"
+                                                    onClick={() => toggleSubjectExpansion(subjectKey)}
+                                                >
+                                                    {subject.name}
+                                                </h4>
+                                                <button
+                                                    className="bg-red-500 text-white px-3 py-2 rounded-lg text-sm"
+                                                    onClick={() => deleteSubject(examIndex, subjectIndex)}
+                                                >
+                                                    Delete
+                                                </button>
+                                            </div>
+                                            {isSubjectExpanded && (
+                                                <div className="mt-2">
+                                                    <div className="mb-2">
+                                                        <button
+                                                            className="bg-blue-500 text-white px-4 py-3 rounded-lg text-base w-full md:w-auto"
+                                                            onClick={() => toggleEditMode(examIndex, "topic", subjectIndex)}
+                                                        >
+                                                            {editMode[`${examIndex}-${subjectIndex}-topic`] ? "Cancel" : "Add Topic"}
+                                                        </button>
+                                                        {editMode[`${examIndex}-${subjectIndex}-topic`] && (
+                                                            <div className="mt-2 flex flex-col gap-2">
+                                                                <input
+                                                                    type="text"
+                                                                    placeholder="Topic Name"
+                                                                    className="p-3 border rounded-lg flex-1 text-base"
+                                                                    id={`topic-${examIndex}-${subjectIndex}`}
+                                                                />
+                                                                <input
+                                                                    type="text"
+                                                                    placeholder="Subtopics (comma-separated, optional)"
+                                                                    className="p-3 border rounded-lg flex-1 text-base"
+                                                                    id={`subtopics-${examIndex}-${subjectIndex}`}
+                                                                />
+                                                                <button
+                                                                    className="bg-green-500 text-white px-4 py-3 rounded-lg text-base"
+                                                                    onClick={() => {
+                                                                        const topicName = document.getElementById(`topic-${examIndex}-${subjectIndex}`).value;
+                                                                        const subtopics = document.getElementById(`subtopics-${examIndex}-${subjectIndex}`).value;
+                                                                        addTopic(examIndex, subjectIndex, topicName, subtopics);
+                                                                        document.getElementById(`topic-${examIndex}-${subjectIndex}`).value = "";
+                                                                        document.getElementById(`subtopics-${examIndex}-${subjectIndex}`).value = "";
+                                                                        toggleEditMode(examIndex, "topic", subjectIndex);
+                                                                    }}
+                                                                >
+                                                                    Save
+                                                                </button>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                    {subject.topics.map((topic, topicIndex) => {
+                                                        const topicKey = `${examIndex}-${subjectIndex}-${topicIndex}`;
+                                                        const isTopicExpanded = expandedTopics[topicKey];
+                                                        return (
+                                                            <div key={topic.name} className="mb-2 ml-4">
+                                                                <div 
+                                                                    className="flex flex-col md:flex-row items-start md:items-center justify-between cursor-pointer bg-gray-100 p-3 rounded-lg text-base"
+                                                                    onClick={() => toggleTopicExpansion(topicKey)}
+                                                                >
+                                                                    <div className="flex items-center gap-2 mb-2 md:mb-0">
+                                                                        {subject.driveLinks[topic.name] ? (
+                                                                            <a
+                                                                                href={subject.driveLinks[topic.name]}
+                                                                                target="_blank"
+                                                                                rel="noopener noreferrer"
+                                                                                className="text-blue-600 underline"
+                                                                            >
+                                                                                {topic.name}
+                                                                            </a>
+                                                                        ) : (
+                                                                            <span>{topic.name}</span>
+                                                                        )}
+                                                                        <button
+                                                                            className="bg-red-500 text-white px-3 py-2 rounded-lg text-sm"
+                                                                            onClick={(e) => {
+                                                                                e.stopPropagation();
+                                                                                deleteTopic(examIndex, subjectIndex, topic.name);
+                                                                            }}
+                                                                        >
+                                                                            Delete
+                                                                        </button>
+                                                                    </div>
+                                                                    <button
+                                                                        className={`px-3 py-2 rounded text-sm w-full md:w-auto ${
+                                                                            subject.completedTopics.includes(topic.name)
+                                                                                ? "bg-green-500 text-white"
+                                                                                : "bg-gray-300 text-gray-700"
+                                                                        }`}
+                                                                        onClick={(e) => {
+                                                                            e.stopPropagation();
+                                                                            toggleTopicCompletion(exam.name, subjectIndex, topic.name);
+                                                                        }}
+                                                                    >
+                                                                        {subject.completedTopics.includes(topic.name) ? "Done" : "Mark Done"}
+                                                                    </button>
+                                                                </div>
+                                                                {isTopicExpanded && (
+                                                                    <div className="ml-4 mt-2">
+                                                                        <div className="mb-2">
+                                                                            <button
+                                                                                className="bg-blue-500 text-white px-4 py-3 rounded-lg text-base w-full md:w-auto"
+                                                                                onClick={() => toggleEditMode(examIndex, "subtopic", subjectIndex, topicIndex)}
+                                                                            >
+                                                                                {editMode[`${examIndex}-${subjectIndex}-${topicIndex}-subtopic`] ? "Cancel" : "Add Subtopic"}
+                                                                            </button>
+                                                                            {editMode[`${examIndex}-${subjectIndex}-${topicIndex}-subtopic`] && (
+                                                                                <div className="mt-2 flex flex-col md:flex-row gap-2">
+                                                                                    <input
+                                                                                        type="text"
+                                                                                        placeholder="Subtopic Name"
+                                                                                        className="p-3 border rounded-lg flex-1 text-base"
+                                                                                        id={`subtopic-${examIndex}-${subjectIndex}-${topicIndex}`}
+                                                                                    />
+                                                                                    <button
+                                                                                        className="bg-green-500 text-white px-4 py-3 rounded-lg text-base"
+                                                                                        onClick={() => {
+                                                                                            const subtopic = document.getElementById(`subtopic-${examIndex}-${subjectIndex}-${topicIndex}`).value;
+                                                                                            addSubtopic(examIndex, subjectIndex, topicIndex, subtopic);
+                                                                                            document.getElementById(`subtopic-${examIndex}-${subjectIndex}-${topicIndex}`).value = "";
+                                                                                            toggleEditMode(examIndex, "subtopic", subjectIndex, topicIndex);
+                                                                                        }}
+                                                                                    >
+                                                                                        Save
+                                                                                    </button>
+                                                                                </div>
+                                                                            )}
+                                                                        </div>
+                                                                        {topic.subtopics.map(subtopic => (
+                                                                            <div
+                                                                                key={subtopic}
+                                                                                className="flex flex-col md:flex-row items-start md:items-center justify-between text-sm py-2"
+                                                                            >
+                                                                                <div className="flex items-center gap-2 mb-2 md:mb-0">
+                                                                                    <span>{subtopic}</span>
+                                                                                    <button
+                                                                                        className="bg-red-500 text-white px-3 py-2 rounded-lg text-sm"
+                                                                                        onClick={() => deleteSubtopic(examIndex, subjectIndex, topicIndex, subtopic)}
+                                                                                    >
+                                                                                        Delete
+                                                                                    </button>
+                                                                                </div>
+                                                                                <button
+                                                                                    className={`px-3 py-2 rounded text-sm w-full md:w-auto ${
+                                                                                        topic.completedSubtopics.includes(subtopic)
+                                                                                            ? "bg-green-500 text-white"
+                                                                                            : "bg-gray-300 text-gray-700"
+                                                                                    }`}
+                                                                                    onClick={() => toggleSubtopicCompletion(exam.name, subjectIndex, topicIndex, subtopic)}
+                                                                                >
+                                                                                    {topic.completedSubtopics.includes(subtopic) ? "Done" : "Mark Done"}
+                                                                                </button>
+                                                                            </div>
+                                                                        ))}
+                                                                        <div className="mt-2">
+                                                                            <input
+                                                                                type="text"
+                                                                                placeholder="Google Drive Link"
+                                                                                className="p-3 border rounded-lg text-base w-full"
+                                                                                defaultValue={subject.driveLinks[topic.name] || ""}
+                                                                                onBlur={(e) => {
+                                                                                    const link = e.target.value;
+                                                                                    if (link) {
+                                                                                        addDriveLink(examIndex, subjectIndex, topic.name, link);
+                                                                                    }
+                                                                                }}
+                                                                            />
+                                                                        </div>
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        );
+                                                    })}
+                                                </div>
+                                            )}
+                                        </div>
+                                    );
+                                })}
+                                <div className="flex flex-col md:flex-row gap-4 mt-4">
+                                    <div className={`dropdown relative flex-1 ${dropdownOpen ? 'active' : ''}`}>
+                                        <button 
+                                            className="bg-green-500 text-white px-4 py-3 rounded-lg w-full text-base"
+                                            onClick={() => setDropdownOpen(!dropdownOpen)}
+                                        >
+                                            Export Progress
+                                        </button>
+                                        <div className="dropdown-menu absolute bg-white shadow-lg rounded-lg mt-1 w-full z-10">
+                                            <div
+                                                className="px-4 py-3 hover:bg-gray-100 cursor-pointer text-base"
+                                                onClick={() => {
+                                                    const data = exam.subjects.map(s => ({
+                                                        Subject: s.name,
+                                                        Progress: `${getSubjectProgress(s).toFixed(2)}%`,
+                                                        "Completed Topics": s.completedTopics.join(", ") || "None",
+                                                        "Completed Subtopics": s.topics.map(t => `${t.name}: ${t.completedSubtopics.join(", ") || "None"}`).join("; ")
+                                                    }));
+                                                    exportToExcel(data, `${exam.name}_Progress`);
+                                                    setDropdownOpen(false);
+                                                }}
+                                            >
+                                                Excel
+                                            </div>
+                                            <div
+                                                className="px-4 py-3 hover:bg-gray-100 cursor-pointer text-base"
+                                                onClick={() => {
+                                                    const data = exam.subjects.map(s => ({
+                                                        Subject: s.name,
+                                                        Progress: `${getSubjectProgress(s).toFixed(2)}%`,
+                                                        "Completed Topics": s.completedTopics.join(", ") || "None",
+                                                        "Completed Subtopics": s.topics.map(t => `${t.name}: ${t.completedSubtopics.join(", ") || "None"}`).join("; ")
+                                                    }));
+                                                    exportToPDF(data, `${exam.name}_Progress`, ["Subject", "Progress", "Completed Topics", "Completed Subtopics"]);
+                                                    setDropdownOpen(false);
+                                                }}
+                                            >
+                                                PDF
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <button
+                                        className="bg-yellow-500 text-white px-4 py-3 rounded-lg text-base flex-1"
+                                        onClick={undoDelete}
+                                        disabled={undoStack.length === 0}
+                                    >
+                                        Undo Delete
+                                    </button>
+                                </div>
+                            </div>
+                        )})}
+                    </div>
+                    <footer className="mt-8 text-center text-gray-600 text-sm">
+                        Created By Akash Chaudhary ❤️
+                    </footer>
+                </div>
+            );
+
+            const renderDeadlines = () => (
+                <div className="container mx-auto px-4 py-8 pb-20 md:pb-8">
+                    <h2 className="text-xl md:text-2xl font-bold mb-6">Exam Deadlines</h2>
+                    <div className="bg-white rounded-lg shadow-md p-6 mb-6">
+                        <h3 className="text-lg md:text-xl font-semibold mb-4">Add New Deadline</h3>
+                        <div className="flex flex-col gap-4">
+                            <select
+                                className="p-3 border rounded-lg text-base"
+                                id="deadlineExam"
+                            >
+                                {exams.map(exam => (
+                                    <option key={exam.name} value={exam.name}>{exam.name}</option>
+                                ))}
+                            </select>
+                            <input
+                                type="date"
+                                className="p-3 border rounded-lg text-base"
+                                id="deadlineDate"
+                            />
+                            <button
+                                className="bg-blue-500 text-white px-4 py-3 rounded-lg text-base"
+                                onClick={() => {
+                                    const examName = document.getElementById("deadlineExam").value;
+                                    const date = document.getElementById("deadlineDate").value;
+                                    addDeadline(examName, date);
+                                }}
+                            >
+                                Add Deadline
+                            </button>
+                        </div>
+                    </div>
+                    <div className="bg-white rounded-lg shadow-md p-6">
+                        <h3 className="text-lg md:text-xl font-semibold mb-4">Upcoming Deadlines</h3>
+                        {deadlines.map((deadline, index) => (
+                            <div key={index} className="mb-2 p-2 bg-gray-50 rounded-lg text-sm">
+                                <p>{deadline.examName}: {getDaysUntil(deadline.date)} days remaining (Date: {deadline.date})</p>
+                            </div>
+                        ))}
+                    </div>
+                    <footer className="mt-8 text-center text-gray-600 text-sm">
+                        Created By Akash Chaudhary ❤️
+                    </footer>
+                </div>
+            );
+
+            const renderProgressDashboard = () => (
+                <div className="container mx-auto px-4 py-8 pb-20 md:pb-8">
+                    <h2 className="text-xl md:text-2xl font-bold mb-6">Progress Dashboard</h2>
+                    <div className="bg-white rounded-lg shadow-md p-6 mb-6">
+                        <h3 className="text-lg md:text-xl font-semibold mb-4">Exam Progress</h3>
+                        <div className="overflow-x-auto">
+                            <canvas id="examProgressChart" className="mb-4 w-full max-w-full"></canvas>
+                        </div>
+                    </div>
+                    <footer className="mt-8 text-center text-gray-600 text-sm">
+                        Created By Akash Chaudhary ❤️
+                    </footer>
+                </div>
+            );
+
+            useEffect(() => {
+                if (currentPage === "progressDashboard") {
+                    const examProgressCtx = document.getElementById("examProgressChart").getContext("2d");
+                    new Chart(examProgressCtx, {
+                        type: "bar",
+                        data: {
+                            labels: exams.map(exam => exam.name),
+                            datasets: [{
+                                label: "Progress (%)",
+                                data: exams.map(exam => getExamProgress(exam)),
+                                backgroundColor: "rgba(59, 130, 246, 0.5)",
+                                borderColor: "rgba(59, 130, 246, 1)",
+                                borderWidth: 1
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            scales: {
+                                y: {
+                                    beginAtZero: true,
+                                    max: 100
+                                }
+                            }
+                        }
+                    });
+                }
+            }, [currentPage, exams]);
+
+            if (isLoading) {
+                return (
+                    <div className="splash-screen fixed inset-0 bg-blue-600 flex items-center justify-center z-50">
+                        <div className="text-white text-2xl font-bold animate-pulse">PrepTrack</div>
+                    </div>
+                );
+            }
+
+            return (
+                <div className="relative min-h-screen">
+                    <nav className="bg-blue-600 text-white p-4 shadow-md md:flex hidden">
+                        <div className="container mx-auto flex justify-between items-center">
+                            <div className="text-2xl font-bold">PrepTrack</div>
+                            <div className="flex gap-4">
+                                <button
+                                    className="hover:bg-blue-700 px-3 py-2 rounded-lg transition text-sm"
+                                    onClick={() => setCurrentPage("home")}
+                                >
+                                    Home
+                                </button>
+                                <button
+                                    className="hover:bg-blue-700 px-3 py-2 rounded-lg transition text-sm"
+                                    onClick={() => setCurrentPage("deadlines")}
+                                >
+                                    Deadlines
+                                </button>
+                                <button
+                                    className="hover:bg-blue-700 px-3 py-2 rounded-lg transition text-sm"
+                                    onClick={() => setCurrentPage("progressDashboard")}
+                                >
+                                    Progress Dashboard
+                                </button>
+                                <button
+                                    className="hover:bg-blue-700 px-3 py-2 rounded-lg transition text-sm"
+                                    onClick={() => setTheme(theme === "light" ? "dark" : "light")}
+                                >
+                                    {theme === "light" ? "Dark Mode" : "Light Mode"}
+                                </button>
+                            </div>
+                        </div>
+                    </nav>
+                    {currentPage === "home" && renderHome()}
+                    {currentPage === "deadlines" && renderDeadlines()}
+                    {currentPage === "progressDashboard" && renderProgressDashboard()}
+                    <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-blue-600 text-white p-4 shadow-md flex justify-around items-center">
+                        <button
+                            className="flex flex-col items-center text-sm"
+                            onClick={() => setCurrentPage("home")}
+                        >
+                            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+                            </svg>
+                            Home
+                        </button>
+                        <button
+                            className="flex flex-col items-center text-sm"
+                            onClick={() => setCurrentPage("deadlines")}
+                        >
+                            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                            </svg>
+                            Deadlines
+                        </button>
+                        <button
+                            className="flex flex-col items-center text-sm"
+                            onClick={() => setCurrentPage("progressDashboard")}
+                        >
+                            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                            </svg>
+                            Progress
+                        </button>
+                        <button
+                            className="flex flex-col items-center text-sm"
+                            onClick={() => setTheme(theme === "light" ? "dark" : "light")}
+                        >
+                            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d={theme === "light" ? "M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z" : "M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"} />
+                            </svg>
+                            {theme === "light" ? "Dark" : "Light"}
+                        </button>
+                    </nav>
+                </div>
+            );
+        }
+
+        ReactDOM.render(<App />, document.getElementById("root"));
+    </script>
+</body>
+</html>
