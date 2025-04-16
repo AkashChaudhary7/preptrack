@@ -1,0 +1,601 @@
+<script type="text/javascript">
+        var gk_isXlsx = false;
+        var gk_xlsxFileLookup = {};
+        var gk_fileData = {};
+        function loadFileData(filename) {
+        if (gk_isXlsx && gk_xlsxFileLookup[filename]) {
+            try {
+                var workbook = XLSX.read(gk_fileData[filename], { type: 'base64' });
+                var firstSheetName = workbook.SheetNames[0];
+                var worksheet = workbook.Sheets[firstSheetName];
+
+                // Convert sheet to JSON to filter blank rows
+                var jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, blankrows: false, defval: '' });
+                // Filter out blank rows (rows where all cells are empty, null, or undefined)
+                var filteredData = jsonData.filter(row =>
+                    row.some(cell => cell !== '' && cell !== null && cell !== undefined)
+                );
+
+                // Convert filtered JSON back to CSV
+                var csv = XLSX.utils.aoa_to_sheet(filteredData); // Create a new sheet from filtered array of arrays
+                csv = XLSX.utils.sheet_to_csv(csv, { header: 1 });
+                return csv;
+            } catch (e) {
+                console.error(e);
+                return "";
+            }
+        }
+        return gk_fileData[filename] || "";
+        }
+        </script><!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>StudyVibe - Exam Prep</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <style>
+    @keyframes slideIn {
+      from { transform: translateY(50px); opacity: 0; }
+      to { transform: translateY(0); opacity: 1; }
+    }
+    @keyframes pulse {
+      0% { transform: scale(1); }
+      50% { transform: scale(1.05); }
+      100% { transform: scale(1); }
+    }
+    .animate-slide-in { animation: slideIn 0.7s ease-out forwards; }
+    .animate-pulse { animation: pulse 2s infinite; }
+    .card-hover:hover {
+      transform: translateY(-5px);
+      box-shadow: 0 12px 20px rgba(0, 0, 0, 0.15);
+    }
+    .dark { background: #1a202c; color: #e2e8f0; }
+    .dark .bg-white { background: #2d3748; }
+    .dark .bg-gradient-to-br { background: linear-gradient(to bottom right, #4a5568, #718096); }
+    .dark .text-purple-800 { color: #b2b7ff; }
+    .dark .text-purple-700 { color: #9f7aea; }
+    .dark .text-blue-600 { color: #63b3ed; }
+    .dark .text-green-600 { color: #68d391; }
+    .dark .text-blue-500 { color: #4299e1; }
+  </style>
+</head>
+<body class="bg-gradient-to-br from-indigo-100 via-purple-100 to-pink-100 font-sans transition-colors duration-300">
+  <!-- Header -->
+  <header class="relative w-full h-80 bg-cover bg-center" style="background-image: url('https://images.unsplash.com/photo-1535083783855-06c4d06b8702?ixlib=rb-4.0.3&auto=format&fit=crop&w=1350&q=80')">
+    <div class="absolute inset-0 bg-gradient-to-b from-black/60 to-transparent"></div>
+    <div class="container mx-auto h-full flex items-center justify-center relative z-10">
+      <div class="text-center">
+        <h1 class="text-4xl font-extrabold text-white animate-slide-in">"Success is where preparation and opportunity meet."</h1>
+        <p class="text-lg text-yellow-200 animate-slide-in" style="animation-delay: 0.2s;">– Bobby Unser</p>
+      </div>
+    </div>
+  </header>
+
+  <!-- Navigation -->
+  <nav class="bg-gradient-to-r from-indigo-600 to-purple-600 text-white p-4 sticky top-0 z-20 shadow-lg">
+    <div class="container mx-auto flex justify-between items-center">
+      <h1 class="text-3xl font-extrabold tracking-tight">StudyVibe</h1>
+      <div class="flex items-center space-x-6">
+        <a href="#tracker" class="text-lg hover:text-yellow-200 transition-colors">Tracker</a>
+        <a href="#materials" class="text-lg hover:text-yellow-200 transition-colors">Materials</a>
+        <a href="#exams" class="text-lg hover:text-yellow-200 transition-colors">Manage Exams</a>
+        <a href="#timer" class="text-lg hover:text-yellow-200 transition-colors">Timer</a>
+        <button id="themeToggle" class="text-lg hover:text-yellow-200">🌙</button>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Exam Deadlines and Search Section -->
+  <section class="container mx-auto py-6 flex flex-col md:flex-row justify-between items-center gap-4">
+    <!-- Exam Deadlines (Left) -->
+    <div id="examTimer" class="bg-white dark:bg-gray-800 p-4 rounded-xl shadow-lg w-full md:w-1/3">
+      <h3 class="text-lg font-bold text-purple-800 dark:text-purple-300 mb-2">Upcoming Exams</h3>
+      <div id="examList" class="space-y-2"></div>
+    </div>
+    <!-- Search Box (Right) -->
+    <div class="w-full md:w-1/3">
+      <input type="text" id="topicSearch" placeholder="Search topics..." class="border-2 border-purple-300 p-3 rounded-lg w-full focus:outline-none focus:border-purple-500 bg-white dark:bg-gray-700 dark:text-white">
+    </div>
+  </section>
+
+  <!-- Tracker Section -->
+  <section id="tracker" class="container mx-auto py-12">
+    <h2 class="text-4xl font-bold text-center text-purple-800 dark:text-purple-300 mb-8 animate-slide-in">Preparation Tracker</h2>
+    <div class="flex justify-center mb-8">
+      <button onclick="addSubject()" class="bg-purple-600 text-white px-6 py-3 rounded-lg hover:bg-purple-700 animate-pulse">Add Subject</button>
+    </div>
+    <div id="subjects" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8"></div>
+  </section>
+
+  <!-- Study Materials Section -->
+  <section id="materials" class="container mx-auto py-12 bg-white dark:bg-gray-800 rounded-lg shadow-lg">
+    <h2 class="text-4xl font-bold text-center text-purple-800 dark:text-purple-300 mb-8 animate-slide-in">Study Materials</h2>
+    <div class="mb-8 flex flex-col md:flex-row justify-center items-center gap-4">
+      <input type="text" id="materialName" placeholder="Material Name" class="border-2 border-purple-300 p-3 rounded-lg w-full md:w-1/3 focus:outline-none focus:border-purple-500 bg-white dark:bg-gray-700 dark:text-white">
+      <input type="file" id="materialFile" accept=".pdf" class="border-2 border-purple-300 p-3 rounded-lg w-full md:w-1/3 bg-white dark:bg-gray-700">
+      <input type="text" id="driveLink" placeholder="Google Drive Link (optional)" class="border-2 border-purple-300 p-3 rounded-lg w-full md:w-1/3 focus:outline-none focus:border-purple-500 bg-white dark:bg-gray-700 dark:text-white">
+      <button onclick="addMaterial()" class="bg-purple-600 text-white px-6 py-3 rounded-lg hover:bg-purple-700">Add Material</button>
+    </div>
+    <div id="materialList" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8"></div>
+  </section>
+
+  <!-- Manage Exams Section -->
+  <section id="exams" class="container mx-auto py-12">
+    <h2 class="text-4xl font-bold text-center text-purple-800 dark:text-purple-300 mb-8 animate-slide-in">Manage Exams</h2>
+    <div class="flex justify-center mb-8">
+      <input type="text" id="examName" placeholder="Exam Name" class="border-2 border-purple-300 p-3 rounded-lg w-full md:w-1/3 mr-2 bg-white dark:bg-gray-700 dark:text-white">
+      <input type="date" id="examDate" class="border-2 border-purple-300 p-3 rounded-lg w-full md:w-1/3 mr-2 bg-white dark:bg-gray-700">
+      <button onclick="addExam()" class="bg-purple-600 text-white px-6 py-3 rounded-lg hover:bg-purple-700">Add Exam</button>
+    </div>
+  </section>
+
+  <!-- Study Time Tracker Section -->
+  <section id="timer" class="container mx-auto py-12 bg-white dark:bg-gray-800 rounded-lg shadow-lg">
+    <h2 class="text-4xl font-bold text-center text-purple-800 dark:text-purple-300 mb-8 animate-slide-in">Study Time Tracker</h2>
+    <div class="flex flex-col items-center mb-8">
+      <input type="text" id="sessionName" placeholder="Session Name (e.g., History Revision)" class="border-2 border-purple-300 p-3 rounded-lg w-full md:w-1/2 mb-4 focus:outline-none focus:border-purple-500 bg-white dark:bg-gray-700 dark:text-white">
+      <div class="flex space-x-4">
+        <button onclick="startTimer()" class="bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 animate-pulse">Start Session</button>
+        <button onclick="stopTimer()" class="bg-red-600 text-white px-6 py-3 rounded-lg hover:bg-red-700">Stop Session</button>
+        <div class="relative">
+          <button id="exportMenu" class="bg-blue-600 text-white px-4 py-3 rounded-lg hover:bg-blue-700">...</button>
+          <div id="exportDropdown" class="absolute hidden right-0 mt-2 w-40 bg-white dark:bg-gray-700 rounded-lg shadow-lg">
+            <button onclick="exportTimeTracker('pdf')" class="block w-full text-left px-4 py-2 text-blue-600 dark:text-blue-300 hover:bg-gray-100 dark:hover:bg-gray-600">Export PDF</button>
+            <button onclick="exportTimeTracker('excel')" class="block w-full text-left px-4 py-2 text-blue-600 dark:text-blue-300 hover:bg-gray-100 dark:hover:bg-gray-600">Export Excel</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div id="timeDisplay" class="text-center text-3xl font-semibold text-purple-800 dark:text-purple-300 mb-8 bg-gradient-to-r from-purple-100 to-pink-100 dark:from-gray-700 dark:to-gray-600 p-4 rounded-lg shadow">00:00:00</div>
+    <div id="timeLog" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8"></div>
+  </section>
+
+  <script>
+    // Exam syllabus data (partial, expandable)
+    const subjects = [
+      {
+        name: "SSC CGL",
+        subSubjects: [
+          {
+            name: "General Intelligence & Reasoning",
+            topics: [
+              { name: "Analogies", theory: "", mcq: [], completed: false },
+              { name: "Coding-Decoding", theory: "", mcq: [], completed: false }
+            ]
+          },
+          {
+            name: "Quantitative Aptitude",
+            topics: [
+              { name: "Number System", theory: "", mcq: [], completed: false },
+              { name: "Geometry", theory: "", mcq: [], completed: false }
+            ]
+          }
+        ]
+      },
+      {
+        name: "UPSC CSE",
+        subSubjects: [
+          {
+            name: "General Studies I",
+            topics: [
+              { name: "Indian Heritage & Culture", theory: "", mcq: [], completed: false },
+              { name: "Modern Indian History", theory: "", mcq: [], completed: false }
+            ]
+          }
+        ]
+      },
+      {
+        name: "RAS",
+        subSubjects: [
+          {
+            name: "Rajasthan History",
+            topics: [
+              { name: "Medieval Rajasthan", theory: "", mcq: [], completed: false },
+              { name: "Rajasthan Culture", theory: "", mcq: [], completed: false }
+            ]
+          }
+        ]
+      },
+      {
+        name: "Assistant Professor Sociology",
+        subSubjects: [
+          {
+            name: "Sociological Theories",
+            topics: [
+              { name: "Durkheim’s Social Facts", theory: "", mcq: [], completed: false },
+              { name: "Marx’s Class Struggle", theory: "", mcq: [], completed: false }
+            ]
+          }
+        ]
+      },
+      {
+        name: "UGC NET Sociology",
+        subSubjects: [
+          {
+            name: "Research Methodology",
+            topics: [
+              { name: "Qualitative Methods", theory: "", mcq: [], completed: false },
+              { name: "Quantitative Methods", theory: "", mcq: [], completed: false }
+            ]
+          }
+        ]
+      }
+    ];
+
+    // State management
+    let progress = JSON.parse(localStorage.getItem('progress')) || {};
+    let materials = JSON.parse(localStorage.getItem('materials')) || [];
+    let exams = JSON.parse(localStorage.getItem('exams')) || [];
+    let timeLog = JSON.parse(localStorage.getItem('timeLog')) || [];
+    let timerInterval, startTime;
+
+    // Theme toggle
+    document.getElementById('themeToggle').addEventListener('click', () => {
+      document.body.classList.toggle('dark');
+      localStorage.setItem('theme', document.body.classList.contains('dark') ? 'dark' : 'light');
+    });
+    if (localStorage.getItem('theme') === 'dark') document.body.classList.add('dark');
+
+    // Export menu toggle
+    document.getElementById('exportMenu').addEventListener('click', () => {
+      document.getElementById('exportDropdown').classList.toggle('hidden');
+    });
+
+    // Topic search
+    document.getElementById('topicSearch').addEventListener('input', (e) => {
+      const query = e.target.value.toLowerCase();
+      renderSubjects(query);
+    });
+
+    // Render subjects
+    function renderSubjects(searchQuery = '') {
+      const subjectsDiv = document.getElementById('subjects');
+      subjectsDiv.innerHTML = '';
+      subjects.forEach(subject => {
+        if (searchQuery && !subject.name.toLowerCase().includes(searchQuery)) return;
+        const totalTopics = subject.subSubjects.reduce((sum, sub) => sum + sub.topics.length, 0);
+        const completedTopics = subject.subSubjects.reduce((sum, sub) => sum + sub.topics.filter(t => progress[t.name]).length, 0);
+        const progressPercent = totalTopics ? Math.round((completedTopics / totalTopics) * 100) : 0;
+        const subjectCard = document.createElement('div');
+        subjectCard.className = 'bg-white dark:bg-gray-800 p-6 rounded-xl shadow-lg transition-transform card-hover';
+        subjectCard.innerHTML = `
+          <h3 class="text-2xl font-bold text-purple-700 dark:text-purple-300 mb-4">${subject.name}</h3>
+          <div class="w-full bg-gray-200 dark:bg-gray-600 rounded-full h-2.5 mb-4">
+            <div class="bg-purple-600 h-2.5 rounded-full" style="width: ${progressPercent}%"></div>
+          </div>
+          <p class="text-green-600 dark:text-green-400 mb-4">${progressPercent}% Complete</p>
+          ${subject.subSubjects.map(sub => {
+            if (searchQuery && !sub.name.toLowerCase().includes(searchQuery)) return '';
+            const subProgress = calculateProgress(sub.topics);
+            return `
+              <div class="mb-6">
+                <button class="text-xl font-semibold text-blue-600 dark:text-blue-400 toggle-btn">${sub.name} ▼</button>
+                <div class="sub-content hidden">
+                  <div class="w-full bg-gray-200 dark:bg-gray-600 rounded-full h-2 mb-2">
+                    <div class="bg-blue-600 h-2 rounded-full" style="width: ${subProgress}%"></div>
+                  </div>
+                  <p class="text-green-600 dark:text-green-400 mb-2">${subProgress}% Complete</p>
+                  ${sub.topics.map(topic => {
+                    if (searchQuery && !topic.name.toLowerCase().includes(searchQuery)) return '';
+                    return `
+                      <div class="ml-4 mt-2">
+                        <label class="flex items-center">
+                          <input type="checkbox" ${progress[topic.name] ? 'checked' : ''} onchange="updateProgress('${topic.name}')" class="h-5 w-5 text-purple-600">
+                          <span class="ml-2 text-gray-700 dark:text-gray-300">${topic.name}</span>
+                        </label>
+                        <div class="ml-8 mt-1">
+                          <a href="${topic.theory}" target="_blank" class="text-blue-500 dark:text-blue-300 hover:text-blue-700 dark:hover:text-blue-500 ${topic.theory ? '' : 'hidden'}">Theory (PDF)</a>
+                          <button onclick="showMCQ(${JSON.stringify(topic.mcq)})" class="text-blue-500 dark:text-blue-300 hover:text-blue-700 dark:hover:text-blue-500 ml-4 ${topic.mcq.length ? '' : 'hidden'}">MCQ</button>
+                          <input type="file" accept=".pdf" onchange="uploadTheory('${subject.name}', '${sub.name}', '${topic.name}', this)" class="text-sm">
+                          <input type="file" accept=".pdf" onchange="uploadMCQ('${subject.name}', '${sub.name}', '${topic.name}', this)" class="text-sm">
+                        </div>
+                      </div>
+                    `;
+                  }).join('')}
+                  <p class="mt-4 text-green-600 dark:text-green-400 font-medium">Progress: ${subProgress}%</p>
+                  <div class="mt-2">
+                    <button onclick="addTopic('${subject.name}', '${sub.name}')" class="text-blue-500 dark:text-blue-300 hover:text-blue-700 dark:hover:text-blue-500">Add Topic</button>
+                  </div>
+                </div>
+              </div>
+            `;
+          }).join('')}
+          <div class="mt-2 flex space-x-4">
+            <button onclick="addSubSubject('${subject.name}')" class="text-blue-500 dark:text-blue-300 hover:text-blue-700 dark:hover:text-blue-500">Add Sub-Subject</button>
+            <button onclick="exportProgress('${subject.name}', 'pdf')" class="text-blue-500 dark:text-blue-300 hover:text-blue-700 dark:hover:text-blue-500">Export PDF</button>
+            <button onclick="exportProgress('${subject.name}', 'excel')" class="text-blue-500 dark:text-blue-300 hover:text-blue-700 dark:hover:text-blue-500">Export Excel</button>
+          </div>
+        `;
+        subjectsDiv.appendChild(subjectCard);
+      });
+      document.querySelectorAll('.toggle-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const content = btn.nextElementSibling;
+          content.classList.toggle('hidden');
+          btn.textContent = btn.textContent.replace(content.classList.contains('hidden') ? '▼' : '▲', content.classList.contains('hidden') ? '▲' : '▼');
+        });
+      });
+    }
+
+    // Calculate progress
+    function calculateProgress(topics) {
+      const total = topics.length;
+      const completed = topics.filter(topic => progress[topic.name]).length;
+      return total ? Math.round((completed / total) * 100) : 0;
+    }
+
+    // Update progress
+    function updateProgress(topicName) {
+      progress[topicName] = !progress[topicName];
+      localStorage.setItem('progress', JSON.stringify(progress));
+      renderSubjects();
+    }
+
+    // Show MCQ
+    function showMCQ(mcq) {
+      if (mcq.length) alert("MCQ: " + mcq.join('\n'));
+      else alert("No MCQs available. Upload an MCQ PDF.");
+    }
+
+    // Add subject
+    function addSubject() {
+      const name = prompt("Enter subject name:");
+      if (name) {
+        subjects.push({ name, subSubjects: [] });
+        renderSubjects();
+      }
+    }
+
+    // Add sub-subject
+    function addSubSubject(subjectName) {
+      const name = prompt("Enter sub-subject name:");
+      if (name) {
+        const subject = subjects.find(s => s.name === subjectName);
+        subject.subSubjects.push({ name, topics: [] });
+        renderSubjects();
+      }
+    }
+
+    // Add topic
+    function addTopic(subjectName, subSubjectName) {
+      const name = prompt("Enter topic name:");
+      if (name) {
+        const subject = subjects.find(s => s.name === subjectName);
+        const sub = subject.subSubjects.find(ss => ss.name === subSubjectName);
+        sub.topics.push({ name, theory: "", mcq: [], completed: false });
+        renderSubjects();
+      }
+    }
+
+    // Upload theory PDF
+    function uploadTheory(subjectName, subSubjectName, topicName, input) {
+      if (input.files.length) {
+        const file = input.files[0];
+        const url = URL.createObjectURL(file);
+        const subject = subjects.find(s => s.name === subjectName);
+        const sub = subject.subSubjects.find(ss => ss.name === subSubjectName);
+        const topic = sub.topics.find(t => t.name === topicName);
+        topic.theory = url;
+        renderSubjects();
+      }
+    }
+
+    // Upload MCQ PDF and convert to quiz
+    function uploadMCQ(subjectName, subSubjectName, topicName, input) {
+      if (input.files.length) {
+        const file = input.files[0];
+        const reader = new FileReader();
+        reader.onload = async () => {
+          const typedArray = new Uint8Array(reader.result);
+          const pdf = await pdfjsLib.getDocument(typedArray).promise;
+          let text = '';
+          for (let i = 1; i <= pdf.numPages; i++) {
+            const page = await pdf.getPage(i);
+            const content = await page.getTextContent();
+            text += content.items.map(item => item.str).join(' ') + '\n';
+          }
+          const mcqs = text.split('\n').filter(line => line.match(/^\d+\./)).map(line => line.trim());
+          const subject = subjects.find(s => s.name === subjectName);
+          const sub = subject.subSubjects.find(ss => ss.name === subSubjectName);
+          const topic = sub.topics.find(t => t.name === topicName);
+          topic.mcq = mcqs;
+          renderSubjects();
+        };
+        reader.readAsArrayBuffer(file);
+      }
+    }
+
+    // Add study material
+    function addMaterial() {
+      const name = document.getElementById('materialName').value;
+      const fileInput = document.getElementById('materialFile');
+      const driveLink = document.getElementById('driveLink').value;
+      if (name && (fileInput.files.length || driveLink)) {
+        const material = { name };
+        if (fileInput.files.length) material.url = URL.createObjectURL(fileInput.files[0]);
+        if (driveLink) material.driveLink = driveLink;
+        materials.push(material);
+        localStorage.setItem('materials', JSON.stringify(materials));
+        renderMaterials();
+        document.getElementById('materialName').value = '';
+        document.getElementById('materialFile').value = '';
+        document.getElementById('driveLink').value = '';
+      }
+    }
+
+    // Render study materials
+    function renderMaterials() {
+      const materialList = document.getElementById('materialList');
+      materialList.innerHTML = '';
+      materials.forEach(material => {
+        const materialCard = document.createElement('div');
+        materialCard.className = 'bg-gradient-to-br from-indigo-50 to-purple-50 dark:from-gray-700 dark:to-gray-600 p-6 rounded-xl shadow-lg transition-transform card-hover';
+        materialCard.innerHTML = `
+          <h3 class="text-lg font-bold text-purple-700 dark:text-purple-300">${material.name}</h3>
+          ${material.url ? `<a href="${material.url}" download class="text-blue-500 dark:text-blue-300 hover:text-blue-700 dark:hover:text-blue-500">Download PDF</a>` : ''}
+          ${material.driveLink ? `<a href="${material.driveLink}" target="_blank" class="text-blue-500 dark:text-blue-300 hover:text-blue-700 dark:hover:text-blue-500 ml-4">Google Drive</a>` : ''}
+        `;
+        materialList.appendChild(materialCard);
+      });
+    }
+
+    // Add exam
+    function addExam() {
+      const name = document.getElementById('examName').value;
+      const date = document.getElementById('examDate').value;
+      if (name && date) {
+        exams.push({ name, date });
+        localStorage.setItem('exams', JSON.stringify(exams));
+        renderExams();
+        document.getElementById('examName').value = '';
+        document.getElementById('examDate').value = '';
+      }
+    }
+
+    // Render exams
+    function renderExams() {
+      const examList = document.getElementById('examList');
+      examList.innerHTML = '';
+      exams.forEach(exam => {
+        const daysLeft = Math.ceil((new Date(exam.date) - new Date()) / (1000 * 60 * 60 * 24));
+        const examCard = document.createElement('div');
+        examCard.className = 'bg-gradient-to-r from-purple-100 to-pink-100 dark:from-gray-700 dark:to-gray-600 p-3 rounded-lg shadow animate-pulse';
+        examCard.innerHTML = `
+          <h4 class="text-sm font-semibold text-purple-700 dark:text-purple-300">${exam.name}</h4>
+          <p class="text-green-600 dark:text-green-400 text-xs">${daysLeft} days left</p>
+        `;
+        examList.appendChild(examCard);
+      });
+    }
+
+    // Study time tracker
+    function startTimer() {
+      const sessionName = document.getElementById('sessionName').value || 'Unnamed Session';
+      startTime = new Date();
+      timerInterval = setInterval(updateTimer, 1000);
+      document.getElementById('sessionName').value = '';
+    }
+
+    function stopTimer() {
+      if (startTime) {
+        const endTime = new Date();
+        const duration = Math.floor((endTime - startTime) / 1000);
+        const sessionName = document.getElementById('sessionName').value || 'Unnamed Session';
+        timeLog.push({ date: startTime.toISOString(), duration, sessionName });
+        localStorage.setItem('timeLog', JSON.stringify(timeLog));
+        clearInterval(timerInterval);
+        document.getElementById('timeDisplay').textContent = '00:00:00';
+        renderTimeLog();
+      }
+    }
+
+    function updateTimer() {
+      const elapsed = Math.floor((new Date() - startTime) / 1000);
+      const hours = String(Math.floor(elapsed / 3600)).padStart(2, '0');
+      const minutes = String(Math.floor((elapsed % 3600) / 60)).padStart(2, '0');
+      const seconds = String(elapsed % 60).padStart(2, '0');
+      document.getElementById('timeDisplay').textContent = `${hours}:${minutes}:${seconds}`;
+    }
+
+    // Render time log
+    function renderTimeLog() {
+      const timeLogDiv = document.getElementById('timeLog');
+      timeLogDiv.innerHTML = '';
+      const daily = {}, monthly = {};
+      timeLog.forEach(log => {
+        const date = new Date(log.date);
+        const dayKey = date.toDateString();
+        const monthKey = `${date.getMonth() + 1}-${date.getFullYear()}`;
+        daily[dayKey] = (daily[dayKey] || 0) + log.duration;
+        monthly[monthKey] = (monthly[monthKey] || 0) + log.duration;
+      });
+      Object.entries(daily).forEach(([date, duration]) => {
+        const sessions = timeLog.filter(log => new Date(log.date).toDateString() === date);
+        const card = document.createElement('div');
+        card.className = 'bg-gradient-to-br from-indigo-50 to-purple-50 dark:from-gray-700 dark:to-gray-600 p-6 rounded-xl shadow-lg transition-transform card-hover';
+        card.innerHTML = `
+          <p class="text-lg font-bold text-purple-700 dark:text-purple-300">${date}</p>
+          <p class="text-green-600 dark:text-green-400">${formatDuration(duration)}</p>
+          ${sessions.map(s => `<p class="text-sm text-gray-600 dark:text-gray-300">${s.sessionName}</p>`).join('')}
+        `;
+        timeLogDiv.appendChild(card);
+      });
+    }
+
+    function formatDuration(seconds) {
+      const hours = Math.floor(seconds / 3600);
+      const minutes = Math.floor((seconds % 3600) / 60);
+      return `${hours}h ${minutes}m`;
+    }
+
+    // Export progress
+    function exportProgress(subjectName, format) {
+      const subject = subjects.find(s => s.name === subjectName);
+      const data = subject.subSubjects.map(sub => ({
+        SubSubject: sub.name,
+        Progress: `${calculateProgress(sub.topics)}%`,
+        Topics: sub.topics.map(t => ({
+          Name: t.name,
+          Completed: progress[t.name] ? 'Yes' : 'No',
+          Theory: t.theory ? 'Uploaded' : 'None',
+          MCQ: t.mcq.length ? 'Available' : 'None'
+        }))
+      }));
+      if (format === 'pdf') {
+        const content = data.map(d => `${d.SubSubject}: ${d.Progress}\n${d.Topics.map(t => `  ${t.Name}: ${t.Completed}`).join('\n')}`).join('\n\n');
+        const blob = new Blob([content], { type: 'application/pdf' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${subjectName}_progress.pdf`;
+        a.click();
+      } else if (format === 'excel') {
+        const ws = XLSX.utils.json_to_sheet(data.flatMap(d => d.Topics.map(t => ({
+          Subject: subjectName,
+          SubSubject: d.SubSubject,
+          Topic: t.Name,
+          Progress: d.Progress,
+          Completed: t.Completed,
+          Theory: t.Theory,
+          MCQ: t.MCQ
+        }))));
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, 'Progress');
+        XLSX.write(wb, `${subjectName}_progress.xlsx`);
+      }
+    }
+
+    // Export time tracker
+    function exportTimeTracker(format) {
+      const data = timeLog.map(log => ({
+        Date: new Date(log.date).toLocaleDateString(),
+        Session: log.sessionName,
+        Duration: formatDuration(log.duration)
+      }));
+      if (format === 'pdf') {
+        const content = data.map(d => `${d.Date} - ${d.Session}: ${d.Duration}`).join('\n');
+        const blob = new Blob([content], { type: 'application/pdf' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'time_tracker.pdf';
+        a.click();
+      } else if (format === 'excel') {
+        const ws = XLSX.utils.json_to_sheet(data);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, 'TimeLog');
+        XLSX.write(wb, 'time_tracker.xlsx');
+      }
+    }
+
+    // Initialize
+    renderSubjects();
+    renderMaterials();
+    renderExams();
+    renderTimeLog();
+  </script>
+</body>
+</html>
